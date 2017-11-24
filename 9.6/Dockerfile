@@ -1,15 +1,28 @@
 FROM postgres:9.6-alpine
 MAINTAINER Jeremy Nauta <jeremy@myshowpass.com>
-# Adapted from https://github.com/appropriate/docker-postgis
-# Adapted from https://github.com/DanielDent/docker-postgres-replication
+# Adapted from:
+# https://github.com/appropriate/docker-postgis
+# https://github.com/DanielDent/docker-postgres-replication
+# https://github.com/nebirhos/docker-postgres-replication
 
 RUN echo "http://dl-2.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories; \
     echo "http://dl-3.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories; \
     echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories;
 
-# Replication
-ENV PG_MAX_WAL_SENDERS 8
-ENV PG_WAL_KEEP_SEGMENTS 8
+# Common settings
+# Fixes error "max_wal_senders must be less than max_connections"
+ENV PG_MAX_CONNECTIONS 500
+ENV PG_WAL_KEEP_SEGMENTS 256
+ENV PG_MAX_WAL_SENDERS 100
+
+# Master/slave settings
+ENV REPLICATION_ROLE master
+ENV REPLICATION_USER replication
+ENV REPLICATION_PASSWORD ""
+
+# Slave settings
+ENV POSTGRES_MASTER_SERVICE_HOST localhost
+
 RUN apk add --no-cache gosu
 
 # PostGIS
@@ -63,9 +76,12 @@ RUN set -ex \
     && rm -rf /usr/src/postgis \
     && apk del .fetch-deps .build-deps .build-deps-testing
 
-COPY ./initdb-postgis.sh /docker-entrypoint-initdb.d/postgis.sh
-COPY ./setup-replication.sh /docker-entrypoint-initdb.d/
+COPY ./10-replication-config.sh /docker-entrypoint-initdb.d/
+COPY ./20-replication-setup.sh /docker-entrypoint-initdb.d/
+COPY ./30-initdb-postgis.sh /docker-entrypoint-initdb.d/
 COPY ./update-postgis.sh /usr/local/bin
-COPY ./docker-entrypoint.sh /docker-entrypoint.sh
 
-RUN chmod +x /docker-entrypoint-initdb.d/setup-replication.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint-initdb.d/10-replication-config.sh \
+    /docker-entrypoint-initdb.d/20-replication-setup.sh \
+    /docker-entrypoint-initdb.d/30-initdb-postgis.sh \
+    /usr/local/bin/update-postgis.sh

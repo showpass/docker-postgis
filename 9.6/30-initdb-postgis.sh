@@ -2,6 +2,10 @@
 
 set -e
 
+# Only run on master
+if [ $REPLICATION_ROLE = "master" ]; then
+echo [*] install postgis...
+
 # Perform all actions as $POSTGRES_USER
 export PGUSER="$POSTGRES_USER"
 
@@ -21,3 +25,4 @@ for DB in template_postgis "$POSTGRES_DB"; do
 		CREATE EXTENSION IF NOT EXISTS postgis_tiger_geocoder;
 EOSQL
 done
+fi
